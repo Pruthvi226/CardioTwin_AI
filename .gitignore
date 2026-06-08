@@ -8,12 +8,14 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+test_outputs/
+tmp*/
 
 # Local/demo runtime outputs
-data/
-Datasets/
-models/
-logs/
+/data/
+/Datasets/
+/models/
+/logs/
 *.log
 *.tmp
 

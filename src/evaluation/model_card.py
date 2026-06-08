@@ -7,10 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 
-DISCLAIMER = (
-    "CardioTwin AI is a research and internship-demo analytics tool. "
-    "It is not a medical diagnosis system and has not been clinically validated."
-)
+from src.utils.common import DISCLAIMER
 
 
 def generate_model_card(metrics: pd.DataFrame, out_path: str | Path) -> None:

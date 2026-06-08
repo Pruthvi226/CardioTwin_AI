@@ -10,10 +10,13 @@ def main() -> None:
     artifacts = {
         "metrics": "results/metrics.csv",
         "experiment_report": "reports/experiment_report.md",
+        "generated_summary": "reports/generated_reports/experiment_summary.md",
         "model_card": "reports/model_card.md",
         "dashboard": "app/streamlit_app.py",
         "api": "src/api/main.py",
-        "disclaimer": "Research/demo only. Not a medical diagnosis system.",
+        "docs": "docs/",
+        "assets": "assets/",
+        "disclaimer": "Research demo only. Not for clinical diagnosis or medical decision-making.",
     }
     output = Path("reports/submission_manifest.json")
     output.parent.mkdir(parents=True, exist_ok=True)

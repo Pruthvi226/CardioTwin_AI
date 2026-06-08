@@ -28,13 +28,16 @@ from src.data.dataset_loader import load_demo_csv, load_processed_npz, save_proc
 from src.evaluation.evaluate import (
     classification_metrics,
     plot_confusion_matrix,
+    plot_feature_importance,
     plot_model_comparison,
     regression_metrics,
     save_metrics,
 )
 from src.evaluation.explainability import feature_importance_table
 from src.evaluation.model_card import generate_model_card
-from src.features.mdi_features import build_feature_table
+from src.experiments.tracker import log_experiment
+from src.features.extract_features import extract_features
+from src.features.spectrogram import save_spectrogram_arrays
 from src.features.spectrogram_builder import build_spectrogram_tensor, save_spectrogram_preview
 from src.models.classical_models import feature_columns, train_bp_regressor, train_classical_models
 from src.nlp.report_generator import generate_report
@@ -56,6 +59,7 @@ def _paths(config: dict) -> dict[str, Path]:
     models_path = Path(config["paths"].get("models", "models"))
     return {
         "raw_csv": raw_path / "demo_ppg.csv",
+        "real_csv": raw_path / "real_ppg.csv",
         "processed_npz": processed_path / "demo_windows.npz",
         "features_csv": processed_path / "mdi_features.csv",
         "results": results_path,
@@ -78,12 +82,27 @@ def generate_data(config: dict) -> Path:
     return paths["raw_csv"]
 
 
-def preprocess(config: dict) -> tuple[np.ndarray, pd.DataFrame, pd.DataFrame]:
+def _raw_path_for_dataset(config: dict, dataset: str) -> Path:
     paths = _paths(config)
-    if not paths["raw_csv"].exists():
-        generate_data(config)
+    if dataset == "synthetic":
+        return paths["raw_csv"]
+    if dataset == "real":
+        return paths["real_csv"]
+    raise ValueError("dataset must be 'synthetic' or 'real'")
 
-    frame = load_demo_csv(paths["raw_csv"])
+
+def preprocess(config: dict, dataset: str = "synthetic") -> tuple[np.ndarray, pd.DataFrame, pd.DataFrame]:
+    paths = _paths(config)
+    raw_path = _raw_path_for_dataset(config, dataset)
+    if dataset == "synthetic" and not raw_path.exists():
+        generate_data(config)
+    if dataset == "real" and not raw_path.exists():
+        raise FileNotFoundError(
+            "Real dataset mode expects data/raw/real_ppg.csv with subject_id,time,ppg,fs,stress_label,quality_label,sbp,dbp columns. "
+            "Download WESAD or another suitable wearable PPG dataset manually and convert it to this schema."
+        )
+
+    frame = load_demo_csv(raw_path)
     issues = validate_raw_demo_frame(frame)
     if issues:
         raise ValueError("Raw data validation failed: " + "; ".join(issues))
@@ -101,13 +120,14 @@ def preprocess(config: dict) -> tuple[np.ndarray, pd.DataFrame, pd.DataFrame]:
         raise ValueError("Processed data validation failed: " + "; ".join(processed_issues))
 
     save_processed_npz(paths["processed_npz"], windowed.windows, windowed.labels)
-    features = build_feature_table(windowed.windows, windowed.labels, fs=fs_target)
+    features = extract_features(windowed.windows, windowed.labels, fs=fs_target)
     paths["features_csv"].parent.mkdir(parents=True, exist_ok=True)
     features.to_csv(paths["features_csv"], index=False)
 
     preview_dir = paths["results"] / "plots"
     preview_dir.mkdir(parents=True, exist_ok=True)
     save_spectrogram_preview(windowed.windows[0], preview_dir / "spectrogram_preview.png", fs=fs_target)
+    save_spectrogram_arrays(windowed.windows[: min(64, len(windowed.windows))], fs=fs_target)
     plt.figure(figsize=(8, 3))
     plt.plot(windowed.windows[0], color="#0f766e", linewidth=1.2)
     plt.title("Cleaned PPG Window")
@@ -120,10 +140,40 @@ def preprocess(config: dict) -> tuple[np.ndarray, pd.DataFrame, pd.DataFrame]:
     return windowed.windows, windowed.labels, features
 
 
-def train_all(config: dict) -> pd.DataFrame:
+def subject_wise_indices(labels: pd.DataFrame, train_ratio: float = 0.60, val_ratio: float = 0.20) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, list[str]]]:
+    """Split by subject to reduce biosignal leakage."""
+    rng = np.random.default_rng(42)
+    subjects = np.array(sorted(labels["subject_id"].astype(str).unique()))
+    rng.shuffle(subjects)
+    if len(subjects) < 3:
+        indices = np.arange(len(labels))
+        train_idx, test_idx = train_test_split(indices, test_size=0.25, random_state=42)
+        return train_idx, np.array([], dtype=int), test_idx, {"train": [], "val": [], "test": []}
+
+    n_train = max(1, int(round(len(subjects) * train_ratio)))
+    n_val = max(1, int(round(len(subjects) * val_ratio)))
+    train_subjects = subjects[:n_train]
+    val_subjects = subjects[n_train : n_train + n_val]
+    test_subjects = subjects[n_train + n_val :]
+    if len(test_subjects) == 0:
+        test_subjects = val_subjects[-1:]
+        val_subjects = val_subjects[:-1]
+
+    subject_series = labels["subject_id"].astype(str)
+    train_idx = labels.index[subject_series.isin(train_subjects)].to_numpy()
+    val_idx = labels.index[subject_series.isin(val_subjects)].to_numpy()
+    test_idx = labels.index[subject_series.isin(test_subjects)].to_numpy()
+    return train_idx, val_idx, test_idx, {
+        "train": train_subjects.tolist(),
+        "val": val_subjects.tolist(),
+        "test": test_subjects.tolist(),
+    }
+
+
+def train_all(config: dict, dataset: str = "synthetic") -> pd.DataFrame:
     paths = _paths(config)
     if not paths["processed_npz"].exists() or not paths["features_csv"].exists():
-        windows, labels, features = preprocess(config)
+        windows, labels, features = preprocess(config, dataset=dataset)
     else:
         windows, labels = load_processed_npz(paths["processed_npz"])
         features = pd.read_csv(paths["features_csv"])
@@ -134,13 +184,7 @@ def train_all(config: dict) -> pd.DataFrame:
     y_quality = features["quality_label"].astype(int).to_numpy()
     y_bp = features[["sbp", "dbp"]].to_numpy()
 
-    indices = np.arange(len(features))
-    train_idx, test_idx = train_test_split(
-        indices,
-        test_size=float(config.get("training", {}).get("test_size", 0.25)),
-        random_state=42,
-        stratify=y_stress,
-    )
+    train_idx, val_idx, test_idx, split_subjects = subject_wise_indices(labels)
 
     metrics: list[dict[str, float | str]] = []
     x_train = x_features.iloc[train_idx]
@@ -156,6 +200,7 @@ def train_all(config: dict) -> pd.DataFrame:
 
     importance = feature_importance_table(classical["RandomForest_features"], selected_columns)
     importance.to_csv(paths["results"] / "feature_importance.csv", index=False)
+    plot_feature_importance(importance, paths["reports"] / "figures" / "feature_importance.png")
 
     training = config.get("training", {})
     device = str(training.get("device", "cpu"))
@@ -210,54 +255,81 @@ def train_all(config: dict) -> pd.DataFrame:
     metrics.append(classification_metrics("SpectrogramCNN_stress", y_stress[test_idx], cv_pred))
 
     metrics_frame = save_metrics(metrics, paths["results"] / "metrics.csv")
+    (paths["reports"] / "metrics").mkdir(parents=True, exist_ok=True)
+    metrics_frame.dropna(subset=["f1_score"]).to_json(paths["reports"] / "metrics" / "classification_metrics.json", orient="records", indent=2)
+    metrics_frame.dropna(subset=["mae"]).to_json(paths["reports"] / "metrics" / "regression_metrics.json", orient="records", indent=2)
     plot_model_comparison(metrics_frame, paths["results"] / "plots" / "model_comparison.png")
+    plot_model_comparison(metrics_frame, paths["reports"] / "figures" / "model_comparison.png")
     plot_confusion_matrix(
         y_stress[test_idx],
         cnn_pred,
         paths["results"] / "plots" / "cnn_lstm_confusion_matrix.png",
         "CNN-LSTM Stress Classification",
     )
+    plot_confusion_matrix(
+        y_stress[test_idx],
+        cnn_pred,
+        paths["reports"] / "figures" / "confusion_matrix.png",
+        "CNN-LSTM Stress Classification",
+    )
 
     run_summary = {
         "windows": int(len(windows)),
+        "dataset_mode": dataset,
+        "split_strategy": "subject_wise",
+        "split_subjects": split_subjects,
         "features": selected_columns,
         "ssl_losses": ssl_losses,
         "bp_mae": float(mean_absolute_error(y_bp[test_idx], bp_predictions)),
+        "synthetic_warning": "Synthetic demo results verify the pipeline only. Real-world performance requires subject-wise evaluation on real wearable datasets.",
     }
     (paths["results"] / "run_summary.json").write_text(json.dumps(run_summary, indent=2), encoding="utf-8")
+    log_experiment(
+        {
+            "dataset_name": "demo_ppg" if dataset == "synthetic" else "real_ppg",
+            "dataset_mode": dataset,
+            "model_name": "pipeline_all",
+            "weighted_f1": float(metrics_frame["weighted_f1"].dropna().max()),
+            "mae": float(metrics_frame["mae"].dropna().min()) if metrics_frame["mae"].notna().any() else np.nan,
+            "model_artifact_path": str(paths["models"]),
+            "confusion_matrix_path": str(paths["reports"] / "figures" / "confusion_matrix.png"),
+        }
+    )
     return metrics_frame
 
 
-def evaluate(config: dict) -> None:
+def evaluate(config: dict, dataset: str = "synthetic") -> None:
     paths = _paths(config)
     metrics_path = paths["results"] / "metrics.csv"
     if not metrics_path.exists():
-        metrics = train_all(config)
+        metrics = train_all(config, dataset=dataset)
     else:
         metrics = pd.read_csv(metrics_path)
-    generate_report(metrics_path, paths["reports"] / "experiment_report.md")
+    generate_report(metrics_path, paths["reports"] / "experiment_report.md", dataset=dataset)
+    generate_report(metrics_path, paths["reports"] / "generated_reports" / "experiment_summary.md", dataset=dataset)
     generate_model_card(metrics, paths["reports"] / "model_card.md")
 
 
-def run_stage(stage: str, config: dict) -> None:
+def run_stage(stage: str, config: dict, dataset: str = "synthetic") -> None:
     ensure_project_dirs(config)
     if stage == "generate_data":
         output = generate_data(config)
         print(f"Generated demo data: {output}")
     elif stage == "preprocess":
-        windows, _, features = preprocess(config)
+        windows, _, features = preprocess(config, dataset=dataset)
         print(f"Preprocessed {len(windows)} windows and wrote {len(features)} feature rows.")
     elif stage == "train_all":
-        metrics = train_all(config)
+        metrics = train_all(config, dataset=dataset)
         print(metrics.to_string(index=False))
     elif stage == "evaluate":
-        evaluate(config)
+        evaluate(config, dataset=dataset)
         print("Generated reports/experiment_report.md and reports/model_card.md")
     elif stage == "all":
-        generate_data(config)
-        preprocess(config)
-        metrics = train_all(config)
-        evaluate(config)
+        if dataset == "synthetic":
+            generate_data(config)
+        preprocess(config, dataset=dataset)
+        metrics = train_all(config, dataset=dataset)
+        evaluate(config, dataset=dataset)
         print(metrics.to_string(index=False))
     else:
         raise ValueError(f"Unknown stage: {stage}")
@@ -266,10 +338,11 @@ def run_stage(stage: str, config: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the CardioTwin AI demo pipeline.")
     parser.add_argument("--stage", default="all", choices=["generate_data", "preprocess", "train_all", "evaluate", "all"])
+    parser.add_argument("--dataset", default="synthetic", choices=["synthetic", "real"])
     parser.add_argument("--config", default="config.yaml")
     args = parser.parse_args()
     config = load_config(args.config)
-    run_stage(args.stage, config)
+    run_stage(args.stage, config, dataset=args.dataset)
 
 
 if __name__ == "__main__":

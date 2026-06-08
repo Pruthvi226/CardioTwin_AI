@@ -6,9 +6,10 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
+from src.utils.common import DISCLAIMER
 
 
-def generate_experiment_summary(metrics_df: pd.DataFrame) -> str:
+def generate_experiment_summary(metrics_df: pd.DataFrame, dataset: str = "synthetic") -> str:
     """Generate a structured summary from metrics rows."""
     classification = metrics_df.dropna(subset=["f1_score"]).copy()
     regression = metrics_df.dropna(subset=["mae"]).copy()
@@ -38,6 +39,10 @@ def generate_experiment_summary(metrics_df: pd.DataFrame) -> str:
 ## Executive Summary
 CardioTwin AI converts PPG windows into cleaned signals, morphology/MDI features, spectrogram images, predictive models, and an automated experiment narrative.
 
+## Dataset Used
+Dataset mode: `{dataset}`.
+Synthetic demo results verify the pipeline only. Real-world performance requires subject-wise evaluation on real wearable datasets.
+
 ## Best Classification Result
 {best_text}
 
@@ -58,14 +63,14 @@ CardioTwin AI converts PPG windows into cleaned signals, morphology/MDI features
 - Validate on WESAD/BIDMC/VitalDB or another governed dataset before making clinical claims.
 
 ## Safety Note
-This is a research/demo AI analytics tool, not a medical diagnosis system.
+{DISCLAIMER}
 """
 
 
-def generate_report(metrics_path: str | Path, out_path: str | Path) -> str:
+def generate_report(metrics_path: str | Path, out_path: str | Path, dataset: str = "synthetic") -> str:
     """Read metrics CSV and write a markdown report."""
     metrics = pd.read_csv(metrics_path)
-    report = generate_experiment_summary(metrics)
+    report = generate_experiment_summary(metrics, dataset=dataset)
     output = Path(out_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(report, encoding="utf-8")
@@ -76,8 +81,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate a CardioTwin AI experiment report.")
     parser.add_argument("--metrics", default="results/metrics.csv")
     parser.add_argument("--out", default="reports/experiment_report.md")
+    parser.add_argument("--dataset", default="synthetic")
     args = parser.parse_args()
-    generate_report(args.metrics, args.out)
+    generate_report(args.metrics, args.out, dataset=args.dataset)
 
 
 if __name__ == "__main__":

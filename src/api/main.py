@@ -11,9 +11,11 @@ import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
-from src.features.mdi_features import build_feature_table
+from src.data.signal_quality import assess_signal_quality
+from src.features.extract_features import extract_features
 from src.preprocessing.clean_signal import preprocess_ppg
 from src.preprocessing.segment_windows import create_windows
+from src.utils.common import DISCLAIMER, assess_prediction_risk
 
 
 app = FastAPI(title="CardioTwin AI API", version="1.0.0")
@@ -31,9 +33,14 @@ def _load_model() -> Any | None:
     return joblib.load(model_path)
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"project": "CardioTwin AI", "status": "running", "disclaimer": DISCLAIMER}
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "disclaimer": DISCLAIMER}
 
 
 @app.post("/predict")
@@ -48,7 +55,8 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
         windows = windows.reshape(1, -1)
 
     labels = pd.DataFrame({"stress_label": [0] * len(windows), "quality_label": [1] * len(windows)})
-    features = build_feature_table(windows, labels, fs=target_fs)
+    features = extract_features(windows, labels, fs=target_fs)
+    quality = assess_signal_quality(windows[0], fs=target_fs)
     model = _load_model()
     feature_row = features.drop(columns=[column for column in features.columns if column in {"stress_label", "quality_label"}])
     feature_row = feature_row.select_dtypes(include=["number"]).drop(columns=["window_id"], errors="ignore").head(1)
@@ -58,16 +66,60 @@ def predict(request: PredictionRequest) -> dict[str, Any]:
         prediction = int(score >= 0.5)
         confidence = max(score, 1.0 - score)
     else:
-        probabilities = model.predict_proba(feature_row)[0]
-        prediction = int(np.argmax(probabilities))
-        confidence = float(np.max(probabilities))
+        try:
+            probabilities = model.predict_proba(feature_row)[0]
+            prediction = int(np.argmax(probabilities))
+            confidence = float(np.max(probabilities))
+        except ValueError:
+            score = float(features["mdi_score"].iloc[0])
+            prediction = int(score >= 0.5)
+            confidence = max(score, 1.0 - score)
 
+    prediction_name = "stress_like_pattern" if prediction else "baseline_like_pattern"
+    top_features = ["mdi_score", "heart_rate_proxy", "spectral_entropy", "signal_quality_score"]
+    payload = assess_prediction_risk(
+        prediction=prediction_name,
+        confidence=confidence,
+        signal_quality=float(quality["signal_quality_score"]),
+        explanation=[str(quality["artifact_warning"])],
+    )
+    payload.update(
+        {
+            "project": "CardioTwin AI",
+            "mdi_score": round(float(features["mdi_score"].iloc[0]), 4),
+            "top_features": top_features,
+            "extracted_features": features.head(1).to_dict(orient="records")[0],
+        }
+    )
+    return payload
+
+
+@app.get("/model-info")
+def model_info() -> dict[str, Any]:
     return {
-        "predicted_stress_class": prediction,
-        "confidence": round(confidence, 4),
-        "mdi_score": round(float(features["mdi_score"].iloc[0]), 4),
-        "signal_quality_score": round(float(features["signal_quality_score"].iloc[0]), 4),
-        "feature_preview": features.head(1).to_dict(orient="records")[0],
-        "disclaimer": "Research/demo output only; not a medical diagnosis.",
+        "model_name": "RandomForest_features fallback with PyTorch demo baselines",
+        "version": "1.1.0",
+        "training_dataset_mode": "synthetic by default; real mode documented",
+        "metrics_path": "results/metrics.csv",
+        "limitations": [
+            "Synthetic demo results verify the pipeline only.",
+            "Real-world performance requires subject-wise evaluation on governed wearable datasets.",
+        ],
+        "disclaimer": DISCLAIMER,
+    }
+
+
+@app.get("/sample-response")
+def sample_response() -> dict[str, Any]:
+    return {
+        "project": "CardioTwin AI",
+        "prediction": "stress_like_pattern",
+        "confidence": 0.78,
+        "uncertainty": "medium",
+        "signal_quality": 0.62,
+        "risk_flag": "acceptable_demo_prediction",
+        "top_features": ["peak_interval_std", "spectral_entropy", "signal_energy"],
+        "explanation": ["demo response", "confidence and signal quality are review aids"],
+        "disclaimer": DISCLAIMER,
     }
 

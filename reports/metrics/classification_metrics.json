@@ -1,0 +1,67 @@
+[
+  {
+    "model": "RandomForest_features",
+    "task": "stress_or_quality_classification",
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "weighted_f1": 1.0,
+    "roc_auc": NaN,
+    "mae": NaN,
+    "rmse": NaN,
+    "r2": NaN
+  },
+  {
+    "model": "GradientBoosting_features",
+    "task": "stress_or_quality_classification",
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "weighted_f1": 1.0,
+    "roc_auc": NaN,
+    "mae": NaN,
+    "rmse": NaN,
+    "r2": NaN
+  },
+  {
+    "model": "CNNLSTM_raw_windows",
+    "task": "stress_or_quality_classification",
+    "accuracy": 0.75,
+    "precision": 1.0,
+    "recall": 0.75,
+    "f1_score": 0.8571428571428571,
+    "weighted_f1": 0.8571428571428571,
+    "roc_auc": NaN,
+    "mae": NaN,
+    "rmse": NaN,
+    "r2": NaN
+  },
+  {
+    "model": "SSL_encoder_finetuned",
+    "task": "stress_or_quality_classification",
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "weighted_f1": 1.0,
+    "roc_auc": NaN,
+    "mae": NaN,
+    "rmse": NaN,
+    "r2": NaN
+  },
+  {
+    "model": "SpectrogramCNN_stress",
+    "task": "stress_or_quality_classification",
+    "accuracy": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1_score": 0.0,
+    "weighted_f1": 0.0,
+    "roc_auc": NaN,
+    "mae": NaN,
+    "rmse": NaN,
+    "r2": NaN
+  }
+]

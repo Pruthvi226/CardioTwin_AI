@@ -1,0 +1,15 @@
+[
+  {
+    "model": "RandomForest_BP_regression",
+    "task": "bp_regression",
+    "accuracy": NaN,
+    "precision": NaN,
+    "recall": NaN,
+    "f1_score": NaN,
+    "weighted_f1": NaN,
+    "roc_auc": NaN,
+    "mae": 1.7737289519449266,
+    "rmse": 2.044658625960488,
+    "r2": 0.0
+  }
+]

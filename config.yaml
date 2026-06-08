@@ -1,6 +1,6 @@
 # Centralized Configuration for CardioTwin AI
 
-project_name: "CardioTwin AI - Self-Supervised PPG Intelligence and Predictive Health Analytics Platform"
+project_name: "CardioTwin AI: Self-Supervised PPG Intelligence Platform for Predictive Health Signal Analytics"
 
 paths:
   raw_data: "data/raw"
@@ -60,4 +60,18 @@ experiment_tracking:
   metrics_file: "results/metrics.csv"
 
 safety:
-  disclaimer: "Research/demo only. Not a medical diagnosis system."
+  disclaimer: "Research demo only. Not for clinical diagnosis or medical decision-making."
+
+dataset_modes:
+  synthetic:
+    path: "data/raw/demo_ppg.csv"
+    purpose: "Pipeline validation and recruiter demo only"
+  real:
+    path: "data/raw/real_ppg.csv"
+    purpose: "Subject-wise evaluation after manual public dataset preparation"
+
+validation:
+  split_strategy: "subject_wise"
+  train_subject_ratio: 0.6
+  validation_subject_ratio: 0.2
+  test_subject_ratio: 0.2

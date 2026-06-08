@@ -15,4 +15,4 @@ The default workflow uses synthetic PPG-like signals for reproducible pipeline v
 - Outputs should be interpreted as research signals, not clinical advice.
 
 ## Safety Disclaimer
-CardioTwin AI is a research and internship-demo analytics tool. It is not a medical diagnosis system and has not been clinically validated.
+Research demo only. Not for clinical diagnosis or medical decision-making.

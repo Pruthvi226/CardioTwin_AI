@@ -1,5 +1,23 @@
 {
   "windows": 32,
+  "dataset_mode": "synthetic",
+  "split_strategy": "subject_wise",
+  "split_subjects": {
+    "train": [
+      "S04",
+      "S05",
+      "S03",
+      "S08",
+      "S07"
+    ],
+    "val": [
+      "S02",
+      "S06"
+    ],
+    "test": [
+      "S01"
+    ]
+  },
   "features": [
     "mean",
     "std",
@@ -17,11 +35,19 @@
     "area_under_curve",
     "zero_crossings",
     "signal_quality_score",
+    "frequency_power",
+    "dominant_frequency",
+    "spectral_entropy",
+    "ppg_band_power",
+    "signal_energy",
+    "min",
+    "max",
     "mdi_score"
   ],
   "ssl_losses": [
-    0.9998409748077393,
-    0.9941204190254211
+    0.9877007603645325,
+    0.982265293598175
   ],
-  "bp_mae": 1.3745477750222213
+  "bp_mae": 1.7737289519449266,
+  "synthetic_warning": "Synthetic demo results verify the pipeline only. Real-world performance requires subject-wise evaluation on real wearable datasets."
 }
