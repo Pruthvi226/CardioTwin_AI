@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv-1/
+.pytest_cache/
+.env
+.DS_Store
+.idea/
+.vscode/
+
+# Local/demo runtime outputs
+data/
+Datasets/
+models/
+logs/
+*.log
+*.tmp
+
+# Heavy notebooks or scratch exports
+notebooks/.ipynb_checkpoints/

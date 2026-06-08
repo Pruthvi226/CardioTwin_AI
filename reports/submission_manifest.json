@@ -1,0 +1,8 @@
+{
+  "metrics": "results/metrics.csv",
+  "experiment_report": "reports/experiment_report.md",
+  "model_card": "reports/model_card.md",
+  "dashboard": "app/streamlit_app.py",
+  "api": "src/api/main.py",
+  "disclaimer": "Research/demo only. Not a medical diagnosis system."
+}

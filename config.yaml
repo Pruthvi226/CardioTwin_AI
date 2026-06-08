@@ -1,0 +1,63 @@
+# Centralized Configuration for CardioTwin AI
+
+project_name: "CardioTwin AI - Self-Supervised PPG Intelligence and Predictive Health Analytics Platform"
+
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  labels: "data/labels"
+  models: "models"
+  checkpoints: "models"
+  logs: "logs"
+  reports: "reports"
+  results: "results"
+
+preprocessing:
+  target_fs: 64.0
+  window_seconds: 8.0
+  window_size: 512
+  overlap: 0.5
+  bandpass_freq: [0.5, 8.0]
+  normalization: "zscore"
+
+model:
+  encoder:
+    type: "cnn"         # ResNet-style or basic CNN
+    hidden_dim: 128
+  transformer:
+    n_layers: 4
+    n_heads: 8
+    dropout: 0.1
+  ssl:
+    projection_dim: 64
+  tasks:
+    bp_prediction: true
+    stress_classification: true
+    signal_quality_classification: true
+    spectrogram_cv_branch: true
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  demo_epochs: 4
+  ssl_epochs: 2
+  epochs_ssl: 50
+  epochs_finetune: 30
+  test_size: 0.25
+  device: "cpu"
+  save_every: 5
+
+demo:
+  samples: 12000
+  subjects: 8
+  seed: 42
+
+cv_branch:
+  image_size: 64
+
+experiment_tracking:
+  backend: "csv"
+  metrics_file: "results/metrics.csv"
+
+safety:
+  disclaimer: "Research/demo only. Not a medical diagnosis system."

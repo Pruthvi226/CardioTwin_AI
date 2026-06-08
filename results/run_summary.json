@@ -1,0 +1,27 @@
+{
+  "windows": 32,
+  "features": [
+    "mean",
+    "std",
+    "skewness",
+    "kurtosis",
+    "n_peaks",
+    "heart_rate_proxy",
+    "ppi_mean",
+    "ppi_std",
+    "rmssd",
+    "pulse_amplitude",
+    "peak_prominence_mean",
+    "slope_mean",
+    "slope_max",
+    "area_under_curve",
+    "zero_crossings",
+    "signal_quality_score",
+    "mdi_score"
+  ],
+  "ssl_losses": [
+    0.9998409748077393,
+    0.9941204190254211
+  ],
+  "bp_mae": 1.3745477750222213
+}

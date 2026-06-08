@@ -1,0 +1,7 @@
+model,task,accuracy,f1_score,mae,rmse
+RandomForest_features,stress_or_quality_classification,1.0,1.0,,
+GradientBoosting_features,stress_or_quality_classification,1.0,1.0,,
+RandomForest_BP_regression,bp_regression,,,1.3745477750222213,1.5796349629932713
+CNNLSTM_raw_windows,stress_or_quality_classification,0.5,0.3333333333333333,,
+SSL_encoder_finetuned,stress_or_quality_classification,1.0,1.0,,
+SpectrogramCNN_stress,stress_or_quality_classification,0.5,0.3333333333333333,,
