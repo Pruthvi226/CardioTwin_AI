@@ -55,6 +55,13 @@ demo:
 cv_branch:
   image_size: 64
 
+vector_database:
+  enabled: true
+  backend: "sklearn_nearest_neighbors"
+  index_path: "models/ppg_feature_vector_index.joblib"
+  metric: "cosine"
+  top_k: 5
+
 experiment_tracking:
   backend: "csv"
   metrics_file: "results/metrics.csv"

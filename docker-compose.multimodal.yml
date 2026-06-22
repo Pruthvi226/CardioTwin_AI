@@ -1,0 +1,52 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: cardiotwin-multimodal-backend:latest
+    init: true
+    restart: unless-stopped
+    environment:
+      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173"
+      CARDIOTWIN_CONFIG: "/app/app/config.json"
+      CARDIOTWIN_DB_PATH: "/data/health_memory.sqlite3"
+    volumes:
+      - cardiotwin_health_memory:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - cardiotwin
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: "/api"
+    image: cardiotwin-multimodal-frontend:latest
+    init: true
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cardiotwin
+
+volumes:
+  cardiotwin_health_memory:
+
+networks:
+  cardiotwin:
+    driver: bridge

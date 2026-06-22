@@ -1,0 +1,17 @@
+{
+  "age": 48,
+  "gender": "Female",
+  "height": 168,
+  "weight": 78,
+  "heart_rate": 88,
+  "systolic_bp": 138,
+  "diastolic_bp": 86,
+  "spo2": 96,
+  "sleep_hours": 5.8,
+  "activity_level": "low",
+  "smoking_status": false,
+  "diabetes_history": false,
+  "hypertension_history": true,
+  "existing_risk_factors": ["family_history"]
+}
+

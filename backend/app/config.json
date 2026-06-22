@@ -1,0 +1,15 @@
+{
+  "fusion_weights": {
+    "signal": 0.35,
+    "tabular": 0.30,
+    "text": 0.20,
+    "image": 0.15
+  },
+  "risk_bands": {
+    "0-25": "Low Risk",
+    "26-50": "Mild Risk",
+    "51-75": "Moderate Risk",
+    "76-100": "High Risk"
+  }
+}
+

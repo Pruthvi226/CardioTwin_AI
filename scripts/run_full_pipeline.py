@@ -42,6 +42,7 @@ from src.features.spectrogram_builder import build_spectrogram_tensor, save_spec
 from src.models.classical_models import feature_columns, train_bp_regressor, train_classical_models
 from src.nlp.report_generator import generate_report
 from src.preprocessing.segment_windows import window_dataframe
+from src.retrieval.vector_store import build_feature_vector_index
 from src.training.finetune_predictive import (
     predict_torch_classifier,
     train_cnn_lstm_classifier,
@@ -65,6 +66,7 @@ def _paths(config: dict) -> dict[str, Path]:
         "results": results_path,
         "reports": reports_path,
         "models": models_path,
+        "vector_index": models_path / "ppg_feature_vector_index.joblib",
     }
 
 
@@ -184,6 +186,19 @@ def train_all(config: dict, dataset: str = "synthetic") -> pd.DataFrame:
     y_quality = features["quality_label"].astype(int).to_numpy()
     y_bp = features[["sbp", "dbp"]].to_numpy()
 
+    retrieval_config = config.get("vector_database", {})
+    vector_index_path: Path | None = None
+    if bool(retrieval_config.get("enabled", True)):
+        configured_path = retrieval_config.get("index_path")
+        vector_index_path = Path(configured_path) if configured_path else paths["vector_index"]
+        build_feature_vector_index(
+            features,
+            selected_columns,
+            vector_index_path,
+            metric=str(retrieval_config.get("metric", "cosine")),
+            n_neighbors=int(retrieval_config.get("top_k", 5)),
+        )
+
     train_idx, val_idx, test_idx, split_subjects = subject_wise_indices(labels)
 
     metrics: list[dict[str, float | str]] = []
@@ -279,6 +294,12 @@ def train_all(config: dict, dataset: str = "synthetic") -> pd.DataFrame:
         "split_strategy": "subject_wise",
         "split_subjects": split_subjects,
         "features": selected_columns,
+        "vector_index": {
+            "enabled": vector_index_path is not None,
+            "backend": "sklearn_nearest_neighbors",
+            "path": str(vector_index_path) if vector_index_path else None,
+            "vectors": int(len(features)) if vector_index_path else 0,
+        },
         "ssl_losses": ssl_losses,
         "bp_mae": float(mean_absolute_error(y_bp[test_idx], bp_predictions)),
         "synthetic_warning": "Synthetic demo results verify the pipeline only. Real-world performance requires subject-wise evaluation on real wearable datasets.",

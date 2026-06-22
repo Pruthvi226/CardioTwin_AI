@@ -44,6 +44,12 @@
     "max",
     "mdi_score"
   ],
+  "vector_index": {
+    "enabled": true,
+    "backend": "sklearn_nearest_neighbors",
+    "path": "models/ppg_feature_vector_index.joblib",
+    "vectors": 32
+  },
   "ssl_losses": [
     0.9877007603645325,
     0.982265293598175
